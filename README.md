@@ -115,17 +115,13 @@ const processUpdate = (update) => {
 
 ## Installation
 
-Dillinger requires [Node.js](https://nodejs.org/) v10+ to run.
-
-Install the dependencies and devDependencies and start the server.
-
 ```sh
-npm install -S sse-service
+npm install sse-service
 ```
 
 ## API 
 
-### connectSSE(params)
+### `connectSSE(params)`
 
 Setups SSE connection
 

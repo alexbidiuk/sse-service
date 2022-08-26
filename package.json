@@ -1,6 +1,6 @@
 {
   "name": "sse-service",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "Lightweight, fast and framework-agnostic sse service for NodeJS",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
