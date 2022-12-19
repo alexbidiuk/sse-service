@@ -1,9 +1,14 @@
-import { Readable } from 'stream';
 import { curry, generateId } from './utils';
-import { HttpResponse, HttpRequest, HttpResponseHeaders } from './sse.interface';
-import { SSEClientObjInterface } from './sse.interface';
+import {
+  HttpResponse,
+  HttpRequest,
+  HttpResponseHeaders,
+  SSEClientObjInterface
+} from './sse.interface';
 
 const DEFAULT_GROUP = 'defaultSSEGroup';
+
+const writeMutexPerConnection = new WeakMap<HttpResponse, Promise<void>>();
 
 const clientsMap: {
   [group: string]: {
@@ -11,7 +16,11 @@ const clientsMap: {
   };
 } = { [DEFAULT_GROUP]: {} };
 
-const _generateEvent = (msg: string | Record<any, any> | any[], eventType?: string, id?: number) => {
+const _generateEvent = (
+  msg: string | Record<any, any> | any[],
+  eventType?: string,
+  id?: number
+) => {
   const event = {
     ...(eventType && { event: eventType }),
     ...(id && { id }),
@@ -27,36 +36,51 @@ const _generateEvent = (msg: string | Record<any, any> | any[], eventType?: stri
   return `${ret}${endl}`;
 };
 
-const _pipeSSEMessageToResponse = (event: string, connection: HttpResponse) => {
-  const readable = Readable.from(event);
-  readable.pipe(connection, { end: false });
-
-  readable.on('data', () => {
-    if (connection.flushHeaders && event.match(/\n\n$/)) {
-      connection.flushHeaders();
-    }
-  });
-
-  readable.on('error', (err) => {
-    console.log(`Write sse got error: ${err.message}`);
-    throw err;
-  });
+const _pipeSSEMessageToResponse = (
+  event: string,
+  connection: HttpResponse,
+  onWriteCb?: () => void
+) => {
+  const connectionWriteMutex =
+    writeMutexPerConnection.get(connection) || Promise.resolve();
+  writeMutexPerConnection.set(
+    connection,
+    connectionWriteMutex
+      .catch((e) => console.log(e))
+      .finally(
+        () =>
+          new Promise<void>((res) => {
+            const cb = () => {
+              if (onWriteCb) onWriteCb();
+              res();
+            };
+            if (!connection.write(event)) {
+              connection.once('drain', cb);
+            } else {
+              cb();
+            }
+          })
+      )
+  );
 };
 
 const sendSSEToConnection = (
   connection: HttpResponse,
   msg: string | Record<any, any> | any[],
   eventType?: string,
-  sseMsgId?: number
+  sseMsgId?: number,
+  onWriteCb?: () => void
 ): void => {
   const event = _generateEvent(msg, eventType, sseMsgId);
-  _pipeSSEMessageToResponse(event, connection);
+  _pipeSSEMessageToResponse(event, connection, onWriteCb);
 };
 
-const getClientObj = (clientId: string, groupName = DEFAULT_GROUP): SSEClientObjInterface | undefined => {
+const getClientObj = (
+  clientId: string,
+  groupName = DEFAULT_GROUP
+): SSEClientObjInterface | undefined => {
   const client = clientsMap[groupName][clientId];
   if (!client) {
-    console.log(`No client with id: ${clientId}`);
     return;
   }
 
@@ -68,9 +92,15 @@ const sendSSEToClient: (
   msg?: string | Record<any, any> | any[],
   eventType?: string,
   groupName?: string,
-  sseMsgId?: number,
+  sseMsgId?: number
 ) => void = curry(
-  (clientId: string, msg: string | Record<any, any> | any[], eventType = 'message', groupName = DEFAULT_GROUP, sseMsgId?: number) => {
+  (
+    clientId: string,
+    msg: string | Record<any, any> | any[],
+    eventType = 'message',
+    groupName = DEFAULT_GROUP,
+    sseMsgId?: number
+  ) => {
     try {
       const client = getClientObj(clientId, groupName);
 
@@ -87,7 +117,12 @@ const sendSSEToClient: (
   }
 );
 
-const sendSSEToAll = (msg: string | Record<any, any> | any[], eventType?: string, groupName = DEFAULT_GROUP, sseMsgId?: number) => {
+const sendSSEToAll = (
+  msg: string | Record<any, any> | any[],
+  eventType?: string,
+  groupName = DEFAULT_GROUP,
+  sseMsgId?: number
+) => {
   if (!Object.keys(clientsMap[groupName]).length) {
     return;
   }
@@ -102,7 +137,9 @@ const sendSSEToAll = (msg: string | Record<any, any> | any[], eventType?: string
         });
       }
     } catch (e) {
-      console.log(`Error while sending SSE to client with id: ${clientId}: ${e.message}`);
+      console.log(
+        `Error while sending SSE to client with id: ${clientId}: ${e.message}`
+      );
     }
   });
 };
@@ -152,6 +189,8 @@ const connectSSE = ({
     };
   }
 
+  writeMutexPerConnection.set(res, Promise.resolve());
+
   res.write(`\n`);
 
   // keep the connection open by sending a comment
@@ -164,10 +203,14 @@ const connectSSE = ({
     clearInterval(keepAlive);
     if (clientsMap[groupName][clId]) {
       clientsMap[groupName][clId] = Object.assign(clientsMap[groupName][clId], {
-        connections: clientsMap[groupName][clId].connections.filter((connection) => res !== connection)
+        connections: clientsMap[groupName][clId].connections.filter(
+          (connection) => res !== connection
+        )
       });
       if (!clientsMap[groupName][clId].connections.length) {
-        console.log(`Client with id ${clId} disconnected and deleted from sse.`);
+        console.log(
+          `Client with id ${clId} disconnected and deleted from sse.`
+        );
         delete clientsMap[groupName][clId];
       }
     }
@@ -179,8 +222,10 @@ const connectSSE = ({
   return { client: clientsMap[groupName][clId], currConnection: res };
 };
 
-const getAllClientObjs = (groupName = DEFAULT_GROUP): SSEClientObjInterface[] | void => {
-  const clientsObjs = Object.values(clientsMap[groupName]);
+const getAllClientObjs = (
+  groupName = DEFAULT_GROUP
+): SSEClientObjInterface[] | void => {
+  const clientsObjs = Object.values(clientsMap[groupName] || {});
   if (!clientsObjs.length) {
     return;
   }
@@ -192,10 +237,13 @@ const setClientMetadata: (
   meta: Record<string, any>,
   groupName: string
 ) => SSEClientObjInterface | void = curry(
-  (clientId: string, meta: Record<string, any>, groupName = DEFAULT_GROUP): SSEClientObjInterface | void => {
+  (
+    clientId: string,
+    meta: Record<string, any>,
+    groupName = DEFAULT_GROUP
+  ): SSEClientObjInterface | void => {
     const client = clientsMap[groupName][clientId];
     if (!client) {
-      console.log(`No client with id: ${clientId}`);
       return;
     }
     client.meta = meta;
