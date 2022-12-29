@@ -38,7 +38,7 @@ server.route({
 });
 
 ```
-#### Then you can use it like this in some service where you receive updates from the db for example:
+#### Then you can use it like this in some other place where you receive updates from some message queue for instance:
 
 ```typescript
 // someService.ts
@@ -47,13 +47,14 @@ import { sendSSEToClient } from 'sse-service';
 
 // ....
 
-// some function that handles update from DB or whatever
+// some function that handles update from message queue or whatever
 const processUpdate = (update) => {
   const { userId, ...payload } = update;
   
+  // userId equals to value you passed as clientId in connectSSE method
   sendSSEToClient(userId, payload); // this will send payload to every connection that user with userId has
   
-  // OR send update to all:
+  // OR send update to all connected users:
 
   sendSSEToAll(payload);
 }; 
@@ -94,7 +95,7 @@ export class SseController {
 }
 
 ```
-#### Then you can use it like this in some service where you receive updates from the db for example:
+#### Then you can use it like this in some other place where you receive updates from some message queue for instance:
 
 ```typescript
 // someService.ts
@@ -103,10 +104,11 @@ import { sendSSEToClient } from 'sse-service';
 
 // ....
 
-// some function that handles update from DB or whatever
+// some function that handles update from message queue or whatever
 const processUpdate = (update) => {
   const { userId, ...payload } = update;
   
+  // userId equals to value you passed as clientId in connectSSE method
   sendSSEToClient(userId, payload); // this will send payload to every connection that user with userId has
 
   // OR send update to all:
@@ -139,7 +141,7 @@ app.get('/sse', function (req, res) {
 app.listen(3000);
 ```
 
-#### Then you can use it like this in some service where you receive updates from the db for example:
+#### Then you can use it like this in some other place where you receive updates from some message queue for instance:
 
 ```typescript
 // someService.ts
@@ -148,10 +150,11 @@ import { sendSSEToClient } from 'sse-service';
 
 // ....
 
-// some function that handles update from DB or whatever
+// some function that handles update from message queue or whatever
 const processUpdate = (update) => {
   const { userId, ...payload } = update;
   
+  // userId equals to value you passed as clientId in connectSSE method
   sendSSEToClient(userId, payload); // this will send payload to every connection that user with userId has
 
   // OR send update to all:
