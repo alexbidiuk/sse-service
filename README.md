@@ -15,7 +15,7 @@ Written on TS.
 
 ```typescript
 
-import { SSEClientObjInterface, connectSSE } from 'sse-service';
+import { connectSSE } from 'sse-service';
 import { fastify } from 'fastify';
 
 const server = fastify({ logger: true });
