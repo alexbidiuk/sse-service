@@ -15,7 +15,7 @@ Written on TS.
 
 ```typescript
 
-import { SSEClientObjInterface } from 'sse-service';
+import { SSEClientObjInterface, connectSSE } from 'sse-service';
 import { fastify } from 'fastify';
 
 const server = fastify({ logger: true });
@@ -24,7 +24,7 @@ server.route({
   method: 'GET',
   url: '/sse',
   handler: async (req, res) => {
-    sse.connectSSE({
+    connectSSE({
       clientId: 'unique id', // this is a primary key of how your client connection could be retrieved, could be ommited, library will take care of creating unique id  
       // client id could be retrieved from the JWT token for example
       req: req.raw, // here we link to raw NodeJS request object, because its wrapped by Fastify
