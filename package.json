@@ -22,7 +22,9 @@
     "sse",
     "node",
     "stream",
-    "eventsource"
+    "eventsource",
+    "server-sent events",
+    "SSE"
   ],
   "devDependencies": {
     "@types/node": "^18.7.13",
