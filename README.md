@@ -1,5 +1,5 @@
-# SSE service
-## _Lightweight, fast and framework-agnostic sse service for NodeJS_
+# Server-Sent Events (SSE) service
+## _Lightweight, fast and framework-agnostic SSE service for NodeJS_
 
 Written on TS.
 ## Features

@@ -1,7 +1,7 @@
 {
   "name": "sse-service",
-  "version": "1.0.8",
-  "description": "Lightweight, fast and framework-agnostic sse service for NodeJS",
+  "version": "1.0.9",
+  "description": "Lightweight, fast and framework-agnostic Server-Sent Events (SSE) service for NodeJS",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
