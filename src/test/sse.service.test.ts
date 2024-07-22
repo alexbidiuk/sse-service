@@ -3,7 +3,8 @@ import EventSource from 'eventsource';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { createHttpServer, closeServer, getUrl } from './utils/http';
-import { connectSSE, getClientObj, sendSSEToClient } from '../sse.service';
+import {connectSSE, getClientObj, sendSSEToAll, sendSSEToClient} from '../sse.service';
+
 
 let url: string;
 let server: http.Server;
@@ -139,5 +140,68 @@ describe('Session', () => {
         });
 
         expect(receivedData).toEqual(data);
+    });
+
+
+    it('send to all and received message', async () => {
+        const clients: { eventSource: EventSource | null, clientId: string }[] = [{
+            eventSource: null,
+            clientId: 'unique-client-id-1',
+        }, {
+            eventSource: null,
+            clientId: 'unique-client-id-2',
+        }, {
+            eventSource: null,
+            clientId: 'unique-client-id-3',
+        }];
+
+        const data = 'dataMessage'
+        const messageType = 'testType'
+
+        let receivedData: any[] = [];
+        let receivedCounter = 0;
+        let openedCounter = 0;
+
+        await new Promise((done) => {
+            server.on('request', (req, res) => {
+                const clientId = req.url?.split('=')[1] as string;
+                const eventSource = clients.find((client) => client.clientId === clientId)?.eventSource;
+
+                if (eventSource) {
+                    eventSource.addEventListener('open', () => {
+                        openedCounter++;
+                        if (openedCounter === clients.length) {
+                            sendSSEToAll(data, messageType);
+                        }
+                        eventSource.addEventListener(messageType, (event) => {
+                            receivedData.push(event.data);
+                            receivedCounter++;
+                            if (receivedCounter === clients.length) {
+                                done(null);
+                            }
+                        });
+
+                    });
+                }
+
+                connectSSE({
+                    req,
+                    res,
+                    originalResHeaders: req.headers,
+                    clientId,
+                });
+            });
+
+            clients.forEach((client) => {
+                client.eventSource = new EventSource(`${url}?clientId=${client.clientId}`);
+            });
+        });
+        expect(receivedData).toHaveLength(clients.length);
+        expect(receivedData.every((messageData) => messageData === data)).toBeTruthy();
+        expect(receivedCounter).toEqual(clients.length);
+
+        clients.forEach((client) => {
+            client.eventSource?.close();
+        });
     });
 });
